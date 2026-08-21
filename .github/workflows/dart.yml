@@ -1,0 +1,127 @@
+name: Build Zishu APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 1. Code Checkout
+    - uses: actions/checkout@v4
+    
+    # 2. Setup Java
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+    
+    # 3. Setup Flutter
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        channel: 'stable'
+    
+    # 4. Get Dependencies
+    - name: Get Flutter Dependencies
+      run: flutter pub get
+    
+    # 5. Create Keystore Directory
+    - name: Create Keystore Directory
+      run: mkdir -p android/app
+    
+    # 6. Generate Keystore
+    - name: Generate Keystore
+      run: |
+        keytool -genkey -v \
+          -keystore android/app/zishu-keystore.jks \
+          -keyalg RSA \
+          -keysize 2048 \
+          -validity 10000 \
+          -alias zishu \
+          -storepass zishu123 \
+          -keypass zishu123 \
+          -dname "CN=Zishan, OU=StardustOfficial, O=StardustOfficial, L=New Delhi, ST=Delhi, C=IN"
+    
+    # 7. Build APK
+    - name: Build APK
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" == "debug" ]; then
+          flutter build apk --debug
+        else
+          flutter build apk --release --split-per-abi
+        fi
+    
+    # 8. List Build Output
+    - name: List Build Output
+      run: |
+        echo "=== APK Files ==="
+        find build -name "*.apk" -type f
+        echo "=== Directory Structure ==="
+        ls -la build/app/outputs/
+    
+    # 9. Upload APK Artifacts
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: zishu-apk
+        path: |
+          build/app/outputs/flutter-apk/*.apk
+          build/app/outputs/apk/release/*.apk
+        compression-level: 0
+        if-no-files-found: warn
+    
+    # 10. Create Release
+    - name: Create Release
+      if: github.event_name == 'push'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          build/app/outputs/flutter-apk/*.apk
+          build/app/outputs/apk/release/*.apk
+        tag_name: v1.0.${{ github.run_number }}
+        name: Zishu AI v1.0.${{ github.run_number }}
+        body: |
+          ## Zishu AI APK Build
+          
+          ### Features:
+          - Voice Recognition
+          - Always-On Listening
+          - Wake Word Detection ("Zishu")
+          - Proactive Messages
+          - Background Service
+          - Dark/Light Mode
+          - Hindi & English Support
+          - Notification Support
+          - Home Screen Commands
+          
+          ### Installation:
+          1. Download the APK
+          2. Enable "Unknown Sources" in Settings
+          3. Install the APK
+          4. Grant Microphone Permission
+          5. Start using Zishu!
+          
+          ### Build Info:
+          - Build Number: ${{ github.run_number }}
+          - Commit: ${{ github.sha }}
+          - Branch: ${{ github.ref_name }}
+          - Build Type: ${{ github.event.inputs.build_type || 'release' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
