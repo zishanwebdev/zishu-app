@@ -1,0 +1,51 @@
+# Flutter
+**/pubspec.lock
+**/pubspec.yaml.bak
+**/android/.gradle
+**/android/app/.gradle
+**/android/app/build
+**/android/build
+**/ios/Pods
+**/ios/.symlinks
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Runner/Info.plist
+**/build/
+**/coverage/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.metadata
+
+# Keystore
+*.jks
+*.keystore
+**/android/app/zishu-keystore.jks
+
+# IDE
+**/.idea/
+**/.vscode/
+**/*.iml
+**/*.swp
+**/*.swo
+**/.DS_Store
+
+# Environment
+.env
+*.env
+**/.env
+
+# Logs
+**/logs/
+*.log
+**/build.log
+
+# Temporary
+*.tmp
+*.temp
+*.bak
+*.orig
