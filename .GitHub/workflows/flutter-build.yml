@@ -1,0 +1,127 @@
+name: Build Zishu APK
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 1. Checkout Code
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    # 2. Setup Java
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+    
+    # 3. Setup Android SDK
+    - name: Setup Android SDK
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget unzip
+        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        unzip commandlinetools-linux-9477386_latest.zip -d android-sdk
+        mkdir -p android-sdk/cmdline-tools
+        mv android-sdk/cmdline-tools android-sdk/latest
+        mkdir -p android-sdk/cmdline-tools
+        mv android-sdk/latest android-sdk/cmdline-tools/
+        export ANDROID_HOME=$HOME/android-sdk
+        export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools"
+        yes | sdkmanager --licenses
+        sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+    
+    # 4. Setup Flutter
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+    
+    # 5. Check Flutter Installation
+    - name: Check Flutter
+      run: |
+        flutter --version
+        flutter doctor -v
+    
+    # 6. Create Project Structure
+    - name: Create Project Structure
+      run: |
+        mkdir -p android/app/src/main
+        mkdir -p assets/images assets/sounds assets/animations
+    
+    # 7. Get Dependencies
+    - name: Get Flutter Dependencies
+      run: |
+        flutter clean
+        flutter pub get
+        flutter pub outdated
+    
+    # 8. Generate Keystore
+    - name: Generate Keystore
+      run: |
+        mkdir -p android/app
+        keytool -genkey -v \
+          -keystore android/app/zishu-keystore.jks \
+          -keyalg RSA \
+          -keysize 2048 \
+          -validity 10000 \
+          -alias zishu \
+          -storepass zishu123 \
+          -keypass zishu123 \
+          -dname "CN=Zishan, OU=StardustOfficial, O=StardustOfficial, L=New Delhi, ST=Delhi, C=IN" || echo "Keystore already exists"
+    
+    # 9. Fix Android Gradle
+    - name: Fix Android Build
+      run: |
+        # Update gradle wrapper
+        cd android
+        chmod +x gradlew
+        ./gradlew --version || echo "Gradle check done"
+        cd ..
+    
+    # 10. Build APK
+    - name: Build APK
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" == "debug" ]; then
+          flutter build apk --debug --verbose
+        else
+          flutter build apk --release --split-per-abi --verbose
+        fi
+    
+    # 11. List Build Output
+    - name: List Build Output
+      run: |
+        echo "=== Checking APK files ==="
+        find build -name "*.apk" -type f 2>/dev/null || echo "No APK found yet"
+        echo "=== Directory Structure ==="
+        ls -la build/app/outputs/ 2>/dev/null || echo "Build directory not found"
+    
+    # 12. Upload APK Artifacts
+    - name: Upload APK
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: zishu-apk
+        path: |
+          build/app/outputs/flutter-apk/*.apk
+          build/app/outputs/apk/release/*.apk
+        compression-level: 0
+        if-no-files-found: warn
