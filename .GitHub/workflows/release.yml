@@ -1,0 +1,101 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version Number'
+        required: true
+        default: '1.0.0'
+      build_type:
+        description: 'Build Type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.19.0'
+        channel: 'stable'
+    
+    - name: Get Dependencies
+      run: flutter pub get
+    
+    - name: Generate Keystore
+      run: |
+        keytool -genkey -v \
+          -keystore zishu-keystore.jks \
+          -keyalg RSA \
+          -keysize 2048 \
+          -validity 10000 \
+          -alias zishu \
+          -storepass zishu123 \
+          -keypass zishu123 \
+          -dname "CN=Zishan, OU=StardustOfficial, O=StardustOfficial, L=New Delhi, ST=Delhi, C=IN"
+        mkdir -p android/app
+        cp zishu-keystore.jks android/app/
+    
+    - name: Build APK
+      run: |
+        if [ "${{ github.event.inputs.build_type }}" == "debug" ]; then
+          flutter build apk --debug
+        else
+          flutter build apk --release --split-per-abi
+        fi
+    
+    - name: Create Release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "build/app/outputs/flutter-apk/*.apk,build/app/outputs/apk/release/*.apk"
+        tag: v${{ github.event.inputs.version }}
+        name: Zishu AI v${{ github.event.inputs.version }}
+        body: |
+          ## Zishu AI v${{ github.event.inputs.version }}
+          
+          ### 📱 Features
+          - **Voice Recognition**: Natural voice commands
+          - **Always-On Listening**: Background voice detection
+          - **Wake Word**: Say "Zishu" to activate
+          - **Proactive Messages**: Auto-reminders
+          - **Notification Support**: Background notifications
+          - **Dark Mode**: Theme toggle
+          - **Multi-Language**: Hindi & English
+          
+          ### 🛠 Installation
+          1. Download the APK
+          2. Enable Unknown Sources
+          3. Install APK
+          4. Grant permissions
+          5. Start using Zishu!
+          
+          ### 📦 APK Files
+          - `app-release.apk` - Universal APK
+          - `app-arm64-v8a-release.apk` - 64-bit devices
+          - `app-armeabi-v7a-release.apk` - 32-bit devices
+          
+          ### 🔧 Technical Details
+          - SDK: Android 5.0+
+          - Min SDK: API 21
+          - Target SDK: API 34
+          - Language: Dart + Flutter
+        token: ${{ secrets.GITHUB_TOKEN }}
+        draft: false
+        prerelease: false
